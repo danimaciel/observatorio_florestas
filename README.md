@@ -37,3 +37,22 @@ python -m pytest tests -q
 ```
 
 Visual: identidade "iAgro Florestas" (opção B do esboço), em `app/lib/ui.py::estilo_florestas` e `.streamlit/config.toml`.
+
+## Publicação
+
+- Código (público): https://github.com/danimaciel/observatorio_florestas
+- Dados (privado): https://github.com/danimaciel/observatorio_florestas_dados — Releases `dados-AAAA-MM` com
+  `observatorio_florestas.duckdb`.
+- App no Streamlit Community Cloud: arquivo principal `app/app.py`; secrets:
+
+```toml
+[dados]
+repo = "danimaciel/observatorio_florestas_dados"
+tag = "dados-2026-10"
+arquivo = "observatorio_florestas.duckdb"
+token = "<token fine-grained com leitura de Contents no repositório de dados>"
+```
+
+Para atualizar os dados: rodar o pipeline das Florestas e `pipeline/montar_banco.R`, depois
+`gh release create dados-AAAA-MM data/observatorio_florestas.duckdb --repo danimaciel/observatorio_florestas_dados`
+e trocar `tag` nos secrets (ou republicar com `--clobber` e reiniciar o app).
