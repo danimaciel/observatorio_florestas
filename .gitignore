@@ -1,0 +1,6 @@
+# dados: nunca versionar (banco com pessoas; LGPD) — o app baixa o banco de uma release privada
+data/
+*.duckdb
+__pycache__/
+.pytest_cache/
+.streamlit/secrets.toml
