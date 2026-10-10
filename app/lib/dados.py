@@ -200,7 +200,7 @@ def q(sql: str, params: tuple = ()) -> pd.DataFrame:
 # Filtros globais (definidos na barra lateral em app.py) -----------------------
 
 def periodo() -> tuple[int, int]:
-    return st.session_state.get("periodo", (1990, 2026))
+    return st.session_state.get("periodo", faixa_anos())
 
 
 # Consultas de referência ------------------------------------------------------
@@ -317,6 +317,9 @@ def resumo_temas(doc_uids, n: int = 3) -> str:
     return " · ".join(temas_de_docs(tuple(doc_uids), n).rotulo)
 
 
+@st.cache_data(show_spinner=False)
 def faixa_anos() -> tuple[int, int]:
-    r = q("select min(ano) a0, max(ano) a1 from documento where ano >= 1970")
+    """Todo o recorte, sem corte de ano (os números da tela batem com o site e a apresentação).
+    Lê as tabelas-base, sem o filtro global, para a régua de período não mudar com o filtro."""
+    r = conexao().cursor().execute("select min(ano) a0, max(ano) a1 from documento").df()
     return int(r.a0[0]), int(r.a1[0])

@@ -45,7 +45,7 @@ with st.sidebar:
     st.caption("Centro de Referência da FAO em Florestas Plantadas e Sistemas ILPF · Embrapa Florestas")
     a0, a1 = dados.faixa_anos()
     if "periodo" not in st.session_state:
-        st.session_state["periodo"] = (max(a0, 1990), a1)
+        st.session_state["periodo"] = (a0, a1)   # período completo: mesmos números do site e da apresentação
     st.slider("Período", min_value=a0, max_value=a1, key="periodo",
               help="Projetos pelo ano de início; publicações e tecnologias pelo ano.")
     st.markdown("**Recorte**")
