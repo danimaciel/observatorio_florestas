@@ -115,52 +115,19 @@ with t4:
     tab = s.pivot_table(index=["unidade_id", "unidade"], columns="tipo", values="n", fill_value=0).reset_index()
     ui.tabela_navegavel(tab.sort_values("unidade"), "unidade", "unidade_id", "emb_unid")
 
-st.subheader("Temas em destaque")
-if dados.tem_semantica():
-    tm = dados.temas()
-    macros = tm[tm.nivel == 1].sort_values("n_total", ascending=False)
-    # clique numa barra (visão geral) escolhe o macrotema daquele tema; tratado antes de desenhar o seletor
-    chave_fig = f"emb_temas_fig_{st.session_state.get('emb_fig_n', 0)}"
-    ev = st.session_state.get(chave_fig)
-    if ev and ev.selection.points:
-        rot = ev.selection.points[0].get("y")
-        pai = tm[(tm.nivel == 2) & (tm.rotulo == rot)].pai_id
-        if len(pai):
-            st.session_state["emb_macro"] = pai.iloc[0]
-        st.session_state["emb_fig_n"] = st.session_state.get("emb_fig_n", 0) + 1   # limpa a seleção
-        chave_fig = f"emb_temas_fig_{st.session_state['emb_fig_n']}"
-    macro_sel = st.selectbox("Macrotema", macros.tema_id.tolist(), index=None, format_func=dados.rotulo_tema,
-                             placeholder="Todos — os 20 temas com mais documentos", key="emb_macro")
-    filtro = "and t.macro_id = ?" if macro_sel else ""
-    k = q(f"""select t.tema_id, count(*) n from doc_tema t join documento d using (doc_uid)
-              where d.ano between ? and ? {filtro} group by 1 order by n desc
-              {"" if macro_sel else "limit 20"}""", (a0, a1) + ((macro_sel,) if macro_sel else ()))
-    k["tema"] = k.tema_id.map(dados.rotulo_tema)
-    k["macro"] = k.tema_id.map(tm.set_index("tema_id").pai_id).map(dados.rotulo_tema)
-    k = k.sort_values("n", ascending=False)
-    fig = px.bar(k, x="n", y="tema", color="macro", orientation="h",
-                 height=max(320, 28 * len(k) + 120), color_discrete_map=dados.cores_macrotemas(),
-                 category_orders={"tema": k.tema.tolist()},
-                 labels={"n": "Documentos", "tema": "", "macro": "Macrotema"})
-    # clicar na legenda não esconde barras (a escolha do macrotema é pelo seletor acima)
-    fig.update_layout(legend=dict(itemclick=False, itemdoubleclick=False, orientation="h", yanchor="top", y=-0.12,
-                                  xanchor="left", x=0, title_text=""),
-                      showlegend=not macro_sel, margin=dict(l=0, r=10, t=10))
-    if not macro_sel:
-        fig.update_layout(height=620 + 22 * ((k.macro.nunique() + 1) // 2))   # espaço para a legenda embaixo
-    st.plotly_chart(fig, width="stretch", key=chave_fig, on_select="rerun", selection_mode="points")
-    st.caption("Todos os temas do macrotema escolhido. Para voltar à visão geral, limpe o seletor (×)." if macro_sel
-               else "Os 20 temas com mais documentos no período. **Clique numa barra** (ou use o seletor) para ver "
-                    "todos os temas do macrotema dela.")
-    ui.tabela_navegavel(k[["tema_id", "tema", "macro", "n"]], "tema", "tema_id", "emb_temas", altura=300,
-                        colunas={"tema": "Tema", "macro": "Macrotema", "n": "Documentos"})
-    ui.aviso_tema_provisorio()
-else:
-    ui.aviso_tema_provisorio()
-    k = q("""
-        select lower(any_value(k.keyword_raw)) palavra, count(distinct k.doc_uid) n from documento_keyword k
-        join documento d using (doc_uid) where d.ano between ? and ? group by k.keyword_norm
-        order by n desc limit 20
-    """, (a0, a1))
-    st.plotly_chart(px.bar(k.sort_values("n"), x="n", y="palavra", orientation="h",
-                           labels={"n": "Documentos", "palavra": ""}), width="stretch")
+st.subheader("Temas técnicos em destaque")
+from lib import fp  # noqa: E402
+
+b = q("""select t.doc_uid, t.tema, d.tipo_doc from fp_doc_tema_fp t join documento d using (doc_uid)
+         where d.ano between ? and ?""", (a0, a1))
+tx = fp.taxonomia().set_index("no_id")
+b["tema_rot"] = b.tema.map(tx.rotulo_pt)
+b["linha"] = b.tema.map(tx.linha).map(fp.rotulo_linha_curto)
+k = b.groupby(["tema_rot", "linha"]).doc_uid.nunique().reset_index(name="n").sort_values("n", ascending=False)
+fig = px.bar(k, x="n", y="tema_rot", color="linha", orientation="h", height=max(360, 28 * len(k) + 140),
+             category_orders={"tema_rot": k.tema_rot.tolist()}, color_discrete_sequence=fp.CORES_LINHA,
+             labels={"n": "Documentos", "tema_rot": "", "linha": "Linha do Centro"})
+fig.update_layout(legend=dict(orientation="h", yanchor="top", y=-0.12, x=0, title_text=""))
+st.plotly_chart(fig, width="stretch")
+st.caption("Temas da taxonomia das Florestas Plantadas (detalhe em **Temas técnicos**). Os temas automáticos do "
+           "Observatório geral, cujos rótulos foram pensados para a Embrapa toda, estão em **Temas automáticos**.")
