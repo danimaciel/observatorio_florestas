@@ -98,11 +98,10 @@ elif d.tipo_doc == "publicacao":
         ui.tabela_navegavel(lk, "doc", "doc_uid", "doc_link_b")
 
 if dados.tem_semantica():
-    tm = q("select tema_id, macro_id, score from doc_tema where doc_uid = ?", (param,))
+    tm = q("select tema_id, macro_id from fp_tema_linha where doc_uid = ?", (param,))
     if not tm.empty:
-        st.markdown(f"**Tema:** {dados.rotulo_tema(tm.tema_id[0])}  \n"
-                    f"**Macrotema:** {dados.rotulo_tema(tm.macro_id[0])}")
-        ui.link("tema", tm.tema_id[0], "Explorar este tema", ":material/category:")
+        st.markdown(f"**Tema técnico principal:** {dados.rotulo_tema_fp(tm.tema_id[0])}  \n"
+                    f"**Linha do Centro:** {dados.rotulo_tema_fp(tm.macro_id[0])}")
 
 st.markdown("#### Documentos semelhantes")
 if not dados.tem_semantica():

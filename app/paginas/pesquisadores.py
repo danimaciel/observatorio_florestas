@@ -67,8 +67,8 @@ with t_col:
         # temas dos documentos em comum com cada coautor (palavras-chave se não houver modelo de temas)
         todos = tuple(sorted({d for l in co.docs for d in l}))
         if dados.tem_semantica():
-            kw = q("select doc_uid, tema_id from doc_tema where list_contains(?, doc_uid)", (list(todos),))
-            kw["palavra"] = kw.tema_id.map(dados.rotulo_tema)
+            kw = q("select doc_uid, tema_id from fp_tema_linha where list_contains(?, doc_uid)", (list(todos),))
+            kw["palavra"] = kw.tema_id.map(dados.rotulo_tema_fp)
         else:
             kw = q("""select doc_uid, keyword_norm, lower(any_value(keyword_raw)) palavra from documento_keyword
                       where list_contains(?, doc_uid) group by all""", (list(todos),))
@@ -128,9 +128,9 @@ with t_evo:
                            labels={"ano": "Ano", "size": "Documentos", "tipo": ""}), width="stretch")
     ui.aviso_tema_provisorio()
     if dados.tem_semantica():
-        kw = q("""select t.doc_uid, t.tema_id, d.ano from doc_tema t join documento d using (doc_uid)
+        kw = q("""select t.doc_uid, t.tema_id, d.ano from fp_tema_linha t join documento d using (doc_uid)
                   where list_contains(?, t.doc_uid)""", (docs.doc_uid.tolist(),))
-        kw["palavra"] = kw.tema_id.map(dados.rotulo_tema)
+        kw["palavra"] = kw.tema_id.map(dados.rotulo_tema_fp)
     else:
         kw = q("""select k.doc_uid, lower(any_value(k.keyword_raw)) palavra, d.ano from documento_keyword k
                   join documento d using (doc_uid) where list_contains(?, k.doc_uid)

@@ -34,6 +34,15 @@ ex("create table fp_doc_linha as
     select doc_uid, unnest(string_split(linhas, '+')) linha from fp_doc where linhas is not null")
 ex("create table fp_doc_tema_fp as
     select doc_uid, 'TEM.' || unnest(string_split(temas, '+')) tema from fp_doc where temas is not null and temas <> ''")
+# tema principal e linha do Centro por documento (um registro por documento, como doc_tema):
+# tema = primeiro tema técnico; linha = linha desse tema, ou "Sistemas integrados" para documentos ILPF/SAF
+ex("create table fp_tema_linha as
+    select f.doc_uid,
+           case when f.sis_final = 'INT' then coalesce('TEM.' || nullif(split_part(f.temas, '+', 1), ''), 'SIS.INT')
+                else 'TEM.' || split_part(f.temas, '+', 1) end tema_id,
+           case when f.sis_final = 'INT' then 'LIN.INT' else t.linha end macro_id
+    from fp_doc f left join fp_taxonomia t on t.no_id = 'TEM.' || split_part(f.temas, '+', 1)
+    where (f.temas is not null and f.temas <> '') or f.sis_final = 'INT'")
 ex("create table fp_doc_colecao as
     select doc_uid, 'E' colecao from fp_doc where col_eucalipto union all
     select doc_uid, 'N' from fp_doc where col_nativas union all

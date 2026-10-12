@@ -6,7 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from lib import dados, ui
+from lib import dados, fp, ui
 from lib.dados import q
 
 COD_UF = {"RO": "11", "AC": "12", "AM": "13", "RR": "14", "PA": "15", "AP": "16", "TO": "17", "MA": "21",
@@ -34,19 +34,20 @@ c1, c2, c3 = st.columns([2, 2, 2])
 tipos = c1.pills("Produção", list(dados.TIPOS), selection_mode="multi", default=list(dados.TIPOS),
                  format_func=dados.TIPOS.get, key="mapa_tipos")
 tema_sel = None
-if dados.tem_semantica():
-    tm = dados.temas()
-    macro_ids = tm[tm.nivel == 1].sort_values("n_total", ascending=False).tema_id.tolist()
-    tema_ids = tm[tm.nivel == 2].sort_values("n_total", ascending=False).tema_id.tolist()
-    with c2:
-        tema_sel = st.selectbox("Tema ou macrotema", macro_ids + tema_ids, index=None,
-                                format_func=lambda t: ("◆ " if t.startswith("M") else "") + dados.rotulo_tema(t),
-                                placeholder="Toda a produção", help="◆ = macrotema.")
+# Temas das Florestas Plantadas: linha do Centro (◆) e tema técnico principal de cada documento
+cont = q("select macro_id, tema_id, count(*) n from fp_tema_linha group by all")
+macro_ids = cont.groupby("macro_id").n.sum().sort_values(ascending=False).index.tolist()
+tema_ids = cont.groupby("tema_id").n.sum().sort_values(ascending=False).index.tolist()
+with c2:
+    tema_sel = st.selectbox("Linha do Centro ou tema técnico", macro_ids + tema_ids, index=None,
+                            format_func=lambda t: ("◆ " + fp.rotulo_linha_curto(t)) if t.startswith("LIN") else fp.rotulo(t),
+                            placeholder="Toda a produção",
+                            help="◆ = linha do Centro. Cada documento conta pelo seu tema técnico principal.")
 if not tipos:
     st.info("Escolha ao menos um tipo de produção.")
     st.stop()
-col_tema = ("macro_id" if tema_sel and tema_sel.startswith("M") else "tema_id") if tema_sel else None
-join_tema = "join doc_tema t using (doc_uid)" if tema_sel else ""
+col_tema = ("macro_id" if tema_sel and tema_sel.startswith("LIN") else "tema_id") if tema_sel else None
+join_tema = "join fp_tema_linha t using (doc_uid)" if tema_sel else ""
 filtro_tema = f"and t.{col_tema} = ?" if tema_sel else ""
 params_tema = (tema_sel,) if tema_sel else ()
 
@@ -76,17 +77,17 @@ def mapa_sedes() -> None:
                       join documento d using (doc_uid) where d.ano between ? and ? and list_contains(?, d.tipo_doc)
                       group by 1""", (a0, a1, list(tipos))).set_index("unidade_id").n
         tot = q(f"""select count(*) n, count(*) filter (where t.{col_tema} = ?) nt from documento d
-                    join doc_tema t using (doc_uid) where d.ano between ? and ? and list_contains(?, d.tipo_doc)""",
+                    join fp_tema_linha t using (doc_uid) where d.ano between ? and ? and list_contains(?, d.tipo_doc)""",
                 (tema_sel, a0, a1, list(tipos))).iloc[0]
         tab["especializacao"] = (tab.total / tab.unidade_id.map(tot_un)) / (tot.nt / max(tot.n, 1))
         cor = "especializacao"
     elif dados.tem_semantica():
         dom = q("""select du.unidade_id, t.macro_id, count(distinct du.doc_uid) n from documento_unidade du
-                   join documento d using (doc_uid) join doc_tema t using (doc_uid)
+                   join documento d using (doc_uid) join fp_tema_linha t using (doc_uid)
                    where d.ano between ? and ? and list_contains(?, d.tipo_doc) group by all""",
                 (a0, a1, list(tipos)))
         dom = dom.sort_values("n", ascending=False).drop_duplicates("unidade_id")
-        tab["macrotema"] = tab.unidade_id.map(dom.set_index("unidade_id").macro_id).map(dados.rotulo_tema).fillna("—")
+        tab["macrotema"] = tab.unidade_id.map(dom.set_index("unidade_id").macro_id).map(fp.rotulo_linha_curto).fillna("—")
         cor = "macrotema"
     else:
         cor = None
@@ -103,7 +104,7 @@ def mapa_sedes() -> None:
         color=cor, color_continuous_scale="RdYlGn" if tema_sel else None,
         color_continuous_midpoint=1 if tema_sel else None,
         labels={"total": "Documentos", "projeto": "Projetos", "publicacao": "Publicações", "tecnologia": "Tecnologias",
-                "especializacao": "Especialização", "macrotema": "Macrotema dominante"},
+                "especializacao": "Especialização", "macrotema": "Linha do Centro dominante"},
         zoom=3.2, center={"lat": -14.5, "lon": -52}, height=680, map_style="carto-positron")
     if mostrar_rede:
         r = dados.rede_unidades(a0, a1, ("publicacoes",)).nlargest(n_arcos, "peso")
@@ -126,9 +127,9 @@ def mapa_sedes() -> None:
     st.plotly_chart(fig, width="stretch")
     leg = ("Tamanho = documentos com participação da unidade (líder, depositante, responsável ou afiliação de autor).")
     if tema_sel:
-        leg += f" Tema: **{dados.rotulo_tema(tema_sel)}** — cor = especialização (verde > 1: acima da média)."
+        leg += f" Tema: **{(fp.rotulo_linha_curto(tema_sel) if tema_sel.startswith("LIN") else fp.rotulo(tema_sel))}** — cor = especialização (verde > 1: acima da média)."
     elif cor:
-        leg += " Cor = macrotema com mais documentos da unidade."
+        leg += " Cor = linha do Centro com mais documentos da unidade."
     if mostrar_rede:
         leg += " Linhas = publicações em conjunto (espessura = intensidade)."
     st.caption(leg)
@@ -140,7 +141,7 @@ def mapa_sedes() -> None:
                                              "publicacao": "Publicações", "tecnologia": "Tecnologias",
                                              "especializacao": st.column_config.NumberColumn("Especialização",
                                                                                              format="%.2f"),
-                                             "macrotema": "Macrotema dominante"})
+                                             "macrotema": "Linha do Centro dominante"})
 
 
 # ==================================================================================

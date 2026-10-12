@@ -127,30 +127,30 @@ with t_tema:
     if dados.tem_semantica():
         esp = q("""
             with base as (
-                select t.doc_uid, t.tema_id, max(case when du.unidade_id = ? then 1 else 0 end) da_unidade
-                from doc_tema t join documento d using (doc_uid) left join documento_unidade du using (doc_uid)
-                where d.ano between ? and ? group by t.doc_uid, t.tema_id),
+                select t.doc_uid, t.tema_id, t.macro_id, max(case when du.unidade_id = ? then 1 else 0 end) da_unidade
+                from fp_tema_linha t join documento d using (doc_uid) left join documento_unidade du using (doc_uid)
+                where d.ano between ? and ? group by t.doc_uid, t.tema_id, t.macro_id),
             tot as (select count(*) N, sum(da_unidade) Nu from base)
-            select tema_id, sum(da_unidade) n_unidade, count(*) n_embrapa,
+            select tema_id, any_value(macro_id) macro_id, sum(da_unidade) n_unidade, count(*) n_embrapa,
                    (sum(da_unidade) / any_value(Nu)) / (count(*) / any_value(N)) especializacao
             from base, tot group by tema_id having sum(da_unidade) >= 3
         """, (sel, a0, a1))
-        esp["tema"] = esp.tema_id.map(dados.rotulo_tema)
-        esp["macro"] = esp.tema_id.map(dados.temas().set_index("tema_id").pai_id).map(dados.rotulo_tema)
-        cfg = {"tema": "Tema", "macro": "Macrotema", "n_unidade": "Documentos",
+        esp["tema"] = esp.tema_id.map(dados.rotulo_tema_fp)
+        esp["macro"] = esp.macro_id.map(dados.rotulo_tema_fp)
+        cfg = {"tema": "Tema técnico", "macro": "Linha do Centro", "n_unidade": "Documentos",
                "especializacao": st.column_config.NumberColumn(
                    "Especialização", format="%.1f",
-                   help="Peso do tema na unidade ÷ peso do tema na Embrapa (> 1 = mais que a média)")}
+                   help="Peso do tema na unidade ÷ peso do tema no recorte das Florestas (> 1 = mais que a média)")}
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Temas principais** (mais documentos)")
-            ui.tabela_navegavel(esp.nlargest(20, "n_unidade")[["tema_id", "tema", "n_unidade", "especializacao"]],
-                                "tema", "tema_id", "un_tema_top", colunas=cfg, altura=460)
+            st.dataframe(esp.nlargest(20, "n_unidade")[["tema", "macro", "n_unidade", "especializacao"]],
+                         column_config=cfg, hide_index=True, height=460, width="stretch")
         with c2:
-            st.markdown("**Especialidades relativas** (vs. Embrapa)")
-            ui.tabela_navegavel(esp[esp.n_unidade >= 5].nlargest(20, "especializacao")
-                                [["tema_id", "tema", "n_unidade", "especializacao"]],
-                                "tema", "tema_id", "un_tema_esp", colunas=cfg, altura=460)
+            st.markdown("**Especialidades relativas** (vs. recorte das Florestas)")
+            st.dataframe(esp[esp.n_unidade >= 5].nlargest(20, "especializacao")
+                         [["tema", "macro", "n_unidade", "especializacao"]],
+                         column_config=cfg, hide_index=True, height=460, width="stretch")
         mac = esp.groupby("macro").n_unidade.sum().reset_index().sort_values("n_unidade")
         st.plotly_chart(px.bar(mac, x="n_unidade", y="macro", orientation="h", height=520,
                                labels={"n_unidade": "Documentos da unidade", "macro": ""}), width="stretch")

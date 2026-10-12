@@ -136,7 +136,7 @@ def conexao() -> duckdb.DuckDBPyConnection:
 TABELAS_DOC = ["documento", "documento_unidade", "documento_pessoa", "doc_pessoa", "doc_tema", "doc_bioma",
                "doc_estado", "doc_municipio", "doc_desafio", "documento_keyword", "aresta_unidade",
                "aresta_pessoa", "publicacao", "fp_doc", "fp_doc_linha", "fp_doc_colecao", "fp_doc_kg",
-               "fp_doc_tema_fp"]
+               "fp_doc_tema_fp", "fp_tema_linha"]
 FILTROS = {"linha": [], "colecao": [], "nivel": [], "sistema": []}
 
 
@@ -301,10 +301,16 @@ def rotulo_tema(tema_id: str) -> str:
 def temas_de_docs(doc_uids: tuple[str, ...], n: int = 5, nivel: str = "tema") -> pd.DataFrame:
     """Temas mais frequentes num conjunto de documentos (nivel: 'tema' ou 'macro')."""
     col = "tema_id" if nivel == "tema" else "macro_id"
-    r = q(f"""select {col} tema_id, count(*) n from doc_tema where list_contains(?, doc_uid)
+    r = q(f"""select {col} tema_id, count(*) n from fp_tema_linha where list_contains(?, doc_uid)
               group by 1 order by n desc limit ?""", (list(doc_uids), n))
-    r["rotulo"] = r.tema_id.map(rotulo_tema)
+    r["rotulo"] = r.tema_id.map(rotulo_tema_fp)
     return r
+
+
+def rotulo_tema_fp(no_id: str) -> str:
+    """Rótulo de tema técnico (TEM.*), linha do Centro (LIN.*) ou sistema (SIS.*) das Florestas Plantadas."""
+    from lib import fp
+    return fp.rotulo_linha_curto(no_id) if str(no_id).startswith("LIN") else fp.rotulo(no_id)
 
 
 def resumo_temas(doc_uids, n: int = 3) -> str:
