@@ -9,7 +9,7 @@ st.title("Lacunas")
 st.caption(f"Onde há pouco conhecimento, ou conhecimento que ainda não virou entrega · {a0}–{a1}")
 st.info("Lacuna aqui é **pouca produção registrada** num cruzamento, não necessariamente falta de pesquisa: "
         "parte da produção pode não estar no repositório, e alguns cruzamentos simplesmente não fazem sentido "
-        "(ex.: erva-mate em clima semiárido). Use como ponto de partida para a discussão.",
+        "(ex.: erva-mate em clima semiárido).",
         icon=":material/lightbulb:")
 
 d = fp.docs_facetas(a0, a1)
