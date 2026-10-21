@@ -13,6 +13,7 @@ não é versionada) ele é baixado de uma Release do GitHub, configurada em
 """
 
 import json
+import os
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -22,7 +23,7 @@ import pandas as pd
 import streamlit as st
 
 RAIZ = Path(__file__).resolve().parents[2]
-DB = RAIZ / "data" / "observatorio_florestas.duckdb"
+DB = Path(os.environ.get("OBS_FLORESTAS_DB", RAIZ / "data" / "observatorio_florestas.duckdb"))  # variável: só para testes
 
 TIPOS = {"projeto": "Projetos", "publicacao": "Publicações", "tecnologia": "Tecnologias"}
 CORES_TIPO = {"projeto": "#8A5A3B", "publicacao": "#1F6B45", "tecnologia": "#C8892A"}
@@ -170,7 +171,10 @@ def _con() -> duckdb.DuckDBPyConnection:
     if "_con" not in ss:
         ss["_con"] = base.cursor()
         ss["_con_filtro"] = None
-        ss["_cat"] = base.execute("select current_database()").fetchone()[0]
+        # nome do catálogo sempre entre aspas: online o arquivo baixado chama-se
+        # "observatorio_florestas-<id>.duckdb", e o hífen sem aspas é erro de sintaxe no DuckDB
+        nome = base.execute("select current_database()").fetchone()[0]
+        ss["_cat"] = '"' + nome.replace('"', '""') + '"'
     chave = chave_filtro()
     if ss["_con_filtro"] != chave:
         c, cat = ss["_con"], ss["_cat"]
