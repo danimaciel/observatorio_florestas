@@ -32,3 +32,14 @@ def test_pagina(pagina, filtro):
     at.run()
     at.switch_page(f"paginas/{pagina}.py").run()
     assert not at.exception, [e.value for e in at.exception]
+
+
+# Redes nos três modos: proximidade temática e colaborações potenciais desenham a rede com pyvis
+# (em 2026-11-09 o mesmo código quebrou no Streamlit Cloud com o cosseno em float32 indo para o JSON do template)
+@pytest.mark.parametrize("modo", ["colab", "prox", "pot"])
+def test_redes_modos(modo):
+    at = AppTest.from_file(APP, default_timeout=120)
+    at.session_state["redes_modo"] = modo
+    at.run()
+    at.switch_page("paginas/redes.py").run()
+    assert not at.exception, [e.value for e in at.exception]
